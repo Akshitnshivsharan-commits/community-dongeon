@@ -1,0 +1,57 @@
+name: Game Logic
+
+on:
+  issues:
+    types: [opened]
+
+# Only one game action can run at a time – solves concurrency.
+concurrency:
+  group: game_state
+  cancel-in-progress: false
+
+jobs:
+  process-action:
+    runs-on: ubuntu-latest
+    # Only process issues labeled 'game-action'
+    if: contains(github.event.issue.labels.*.name, 'game-action')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run game engine
+        id: game
+        run: |
+          OUTPUT=$(python game_engine.py \
+            --command "${{ github.event.issue.title }}" \
+            --issue-number ${{ github.event.issue.number }} \
+            --user "${{ github.event.issue.user.login }}" \
+            --repo "${{ github.repository }}")
+          echo "message=$OUTPUT" >> $GITHUB_OUTPUT
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add game_state.json README.md
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "⚔️ ${{ github.event.issue.title }} (by ${{ github.event.issue.user.login }})"
+            git push
+          fi
+
+      - name: Close issue with result message
+        if: always()
+        run: |
+          gh issue close ${{ github.event.issue.number }} \
+            --comment "${{ steps.game.outputs.message }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

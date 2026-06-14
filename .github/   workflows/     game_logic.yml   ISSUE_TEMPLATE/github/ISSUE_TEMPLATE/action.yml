@@ -1,0 +1,9 @@
+name: Game Action
+description: Perform an action in the dungeon.
+labels: ["game-action"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚔️ You are about to submit a game command.
+        Click **Submit new issue** to confirm.
